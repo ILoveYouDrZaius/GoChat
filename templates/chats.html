@@ -1,0 +1,200 @@
+{{ define "title" }}GO-MENSAJES{{ end }}
+
+{{ define "content" }}
+
+	<div class="row" style="margin-top: 50px; margin-bottom: 50px;" ng-controller="LogoutCtrl">
+		<div class="col-xs-1"></div>
+		<div class="col-xs-7" style="display: inline-block; float: none; vertical-align: middle;">
+			<h1 align="left">GO-MENSAJES</h1>
+		</div>
+		<div class="col-xs-1" style="display: inline-block; float: none; vertical-align: middle;">
+			<label align="center"> {{"{{"}} user {{"}}"}} </h1>
+		</div>
+		<div class="col-xs-2" style="display: inline-block; float: none; vertical-align: middle;">
+			<a class="btn btn-danger" role="button" ng-click="logout()">Cerrar sesión</a>
+			<div ng-show="logoutError" class="alert alert-danger">{{"{{"}} message {{"}}"}}</div>
+		</div>
+		<div class="col-xs-1"></div>
+	</div>
+	<div class="row">
+		<div class="col-xs-4" ng-controller="UsersCtrl">
+			<div class="fixed" style="height: 410px; border: 1px solid #ddd; background-color: #eee">
+				<table class="table table-condensed table-striped table-hover">
+				    <thead>
+					    <tr>
+					        <th>Contactos</th>
+					    </tr>
+				    </thead>
+				    <tbody style="height: 375px; overflow-y: auto; display:block">
+					    <tr ng-repeat="Contact in contacts | orderBy:'Nickname'" style="display: block">
+					        <td ng-model="Contact" value="Contact.Nickname" ng-click="getMessages({{" Contact "}})" style="display: block; border: 0px">{{"{{"}} Contact.Nickname {{"}}"}}</td>
+					    </tr>
+				    </tbody>
+				</table>
+			</div>
+		</div>
+		<div class="col-xs-8" ng-controller="MessagesCtrl">
+			<div class="fixed" style="height: 410px; border: 1px solid #ddd; background-color: #eee; margin-bottom: 10px">
+				<div id="messagesTable" class="table table-condensed" style="margin-top: 5px; height: 400px; overflow-y: auto; display: block">
+			    <div ng-repeat="Message in messages">
+			        <div ng-model="Message" style="border-top: none !important; padding: 1px 5px 1px 5px" ng-style="{ 'text-align' : {{" Message.Sender "}} == receiver ? 'left' : 'right'}" value="Message.Text">
+								<label style="border-radius: 5px; padding: 2px 10px 2px 10px; font-weight: 100" ng-style="{ 'background-color' : {{" Message.Sender "}} == receiver ? '#fff' : '#dcf8c6' }">{{"{{"}} Message.Text {{"}}"}}</label>
+							</div>
+			    </div>
+				</div>
+			</div>
+			<input type="text" id="msg" class="form-control" placeholder="Escribe un mensaje aquí" disabled>
+		</div>
+	</div>
+
+{{ end }}
+
+{{ define "script" }}
+
+<script src="/templates/js/jquery.fittext.js"></script>
+<script src="https://js.pusher.com/3.1/pusher.min.js"></script>
+<script type="text/javascript">
+
+	var pusher = new Pusher('4076408f199075cfde1f', {
+      cluster: 'eu',
+      encrypted: true
+    });
+
+	var channel1 = pusher.subscribe('Contacts');
+  var channel2 = pusher.subscribe(localStorage.getItem('user'));
+
+
+	$(document).ready(function(){
+		$("body").fitText(1.0, { minFontSize: '5px', maxFontSize: '14px' });
+		$("h1").fitText(1.2, { minFontSize: '20px', maxFontSize: '40px' });
+	});
+
+	var app = angular.module("MyApp", ['ngCookies']);
+
+  app.controller("LogoutCtrl", ['$scope', '$http', '$window', function($scope, $http, $window) {
+
+		$scope.user = localStorage.getItem('user');
+
+		$scope.logout = function() {
+			$http.post('/logout').
+		    success(function(data, status, headers, config) {
+					if(data.Type == "error"){
+						$scope.message = data.Message;
+						$scope.logoutError = true;
+					}
+					else { //Si no hay error redireccionamos
+						$scope.logoutError = false;
+						localStorage.removeItem('user');
+						$window.location.href = '/';
+					};
+		    }).
+		    error(function(data, status, headers, config) {
+		      alert("Servidor no disponible");
+		    });
+		};
+	}]);
+
+	app.controller("UsersCtrl", ['$scope', '$http', '$window', function($scope, $http, $window) {
+
+		$http.get('/getContacts').
+	    success(function(data, status, headers, config) {
+	      $scope.contacts = data;
+	    }).
+	    error(function(data, status, headers, config) {
+	      alert("Servidor no disponible");
+	    });
+
+			$scope.getMessages = function(contact) {
+
+				if($window.msg.disabled) {
+					$window.msg.disabled = false;
+				}
+
+				$scope.$root.receiver = contact.Nickname;
+
+				//Formamos la cadena JSON con el nombre del usuario y la contraseña
+				var str = '{"Receiver":' + '"' + $scope.$root.receiver + '"}';
+
+				//Parsemaos el string a un objeto JSON
+				var obj = JSON.parse(str);
+
+				$http.post('/getMessages', obj).
+			    success(function(data, status, headers, config) {
+						$scope.$root.messages = data;
+
+						$("#messagesTable").animate({ scrollTop: $('#messagesTable').prop("scrollHeight")}, 100);
+					}).
+					error(function(data, status, headers, config) {
+						alert("Servidor no disponible");
+					});
+			};
+
+			channel1.bind('contacts', function(data) {
+				if($scope.contacts == null){
+					$scope.contacts = [{Nickname: data.Contact}];
+					this.apply();
+				} else {
+	    		$scope.contacts.push({Nickname: data.Contact});
+					this.apply();
+				}
+		  });
+	}]);
+
+	app.controller("MessagesCtrl", ['$scope', '$http', '$window', function($scope, $http, $window) {
+
+			$("#msg").keyup(function(event){
+			    if(event.keyCode == 13){
+
+						$scope.tempMsg = $("#msg").val();
+
+						//Formamos la cadena JSON con el usuario y el texto para enviar al server
+						var str = '{"Receiver":' + '"' + $scope.$root.receiver + '"' + ' , "Text":' + '"' + $scope.tempMsg + '"' + '}';
+
+						//Parsemaos el string a un objeto JSON
+						var obj = JSON.parse(str);
+
+							$http.post('/sendMessage', obj).
+						    success(function(data, status, headers, config) {
+									if(data.Type == "error"){
+										$scope.message = data.Message;
+										$scope.logoutError = true;
+									}
+									else {
+										$scope.logoutError = false;
+
+										if($scope.$root.messages == null) {
+											$scope.$root.messages = [{Text: $scope.tempMsg}];
+										} else {
+											$scope.$root.messages.push({Text: $scope.tempMsg});
+
+											$("#messagesTable").animate({ scrollTop: $('#messagesTable').prop("scrollHeight")}, 100);
+										}
+									};
+						    }).
+						    error(function(data, status, headers, config) {
+						      alert("Servidor no disponible");
+						    });
+
+							$("#msg").val("");
+			    }
+			});
+
+			channel2.bind('notifications', function(data) {
+				if($scope.$root.receiver == data.Sender){
+					if($scope.$root.messages == null) {
+						$scope.$root.messages = [{Sender: data.Sender, Text: data.Text}];
+						$scope.$apply()
+					} else {
+		    		$scope.$root.messages.push({Sender: data.Sender, Text: data.Text});
+						$("#messagesTable").animate({ scrollTop: $('#messagesTable').prop("scrollHeight")}, 100);
+						$scope.$apply()
+					}
+				} else {
+					alert("Otro contacto te ha hablado");
+				}
+		  });
+	}]);
+
+</script>
+
+{{ end }}

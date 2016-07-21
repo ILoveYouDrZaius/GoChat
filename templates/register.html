@@ -1,0 +1,96 @@
+{{ define "title" }}Registro{{ end }}
+
+{{ define "content" }}
+			<div class="page-header" style="border-bottom: 0px">
+				<h1 align="center">Registro</h1>
+			</div>
+
+			<div ng-controller="RegisterCtrl">
+				<form ng-submit="submit()" align="center" class="form-horizontal" style="margin: 0 auto; max-width: 330px; padding: 15px;">
+					<label for="inputUser" class="sr-only">Nickname</label>
+					<input type="text" name="username" ng-model="user.Nickname" id="inputUser" class="form-control" placeholder="Nickname" required autofocus="" style="margin-bottom: 10px; font-size: 16px;">
+
+					<label for="inputPassword" class="sr-only">Contraseña</label>
+					<input type="Password" name="Password" ng-model="user.Password" ng-change="validationInput(user.Password)" class="form-control" id="inputPassword" required placeholder="Contraseña" style="margin-bottom: 5px;  font-size: 16px;">
+					<span ng-hide='advertPassword' class="help-block">{{"{{"}} advertPasswordText {{"}}"}} </span>
+
+					<label for="inputPasswordConfirmation" class="sr-only">Repite contraseña</label>
+					<input type="Password" name="cPassword" ng-model="user.CPassword" ng-change="restoreInput()" class="form-control" id="inputPasswordConfirmation" required placeholder="Confirma contraseña" style="margin-bottom: 5px;  font-size: 16px;">
+					<span ng-hide='advertCPassword' class="help-block" style="margin-bottom: 20px">{{"{{"}} advertCPasswordText {{"}}"}} </span>
+
+					<div ng-show="registerError" class="alert alert-danger">{{"{{"}} message {{"}}"}}</div>
+
+					<button ng-disabled="disable" class="btn btn-lg btn-primary btn-block" type="submit">Registrarse</button>
+					<a href="/" class="btn btn-block btn-lg btn-default" role="button">Atras</a>
+				</form>
+			</div>
+{{ end }}
+
+{{ define "script" }}
+
+<script type="text/javascript">
+
+	var app = angular.module("MyApp", []);
+
+	app.controller("RegisterCtrl", ['$scope', '$http', '$window', function($scope, $http, $window) {
+
+		var strongRegularExp = new RegExp("(^(.){3,}.+$)");
+
+		$scope.submit = function() {
+			if ($scope.user.Password != $scope.user.CPassword) {
+				$scope.advertCPassword = false;
+				$scope.advertCPasswordText = 'Las contraseñas no coinciden';
+				$scope.disable = true;
+				return false;
+			} else {
+
+			//Formamos la cadena JSON con el nombre del usuario y la contraseña
+			var str = '{"Nickname":' + '"' + $scope.user.Nickname + '"' + ' , "Hash":' + '"' + $scope.user.Password + '"' + '}';
+
+			//Parsemaos el string a un objeto JSON
+			var obj = JSON.parse(str);
+
+			//Realizamos la petición POST al servidor
+		  	$http.post('/registerUser', str).
+		    	success(function(data, status, headers, config) {
+		    		//Si ha habido error en el login mostramos el mensaje de error
+		    		if(data.Type == "error"){
+		    			$scope.message = data.Message;
+		    			$scope.registerError = true;
+		    		}
+		    		else{ //Si no hay error redireccionamos
+		    			$scope.registerError = false;
+							localStorage.setItem('user', $scope.user.Nickname);
+		    			$window.location.href = '/';
+		    		}
+		    	}).
+		    	error(function(data, status, headers, config) {
+		      		$scope.message = data;
+		    });
+			}
+    };
+
+    $scope.validationInput = function(value) {
+    	$scope.advertPassword = true;
+
+        if (strongRegularExp.test(value)) {
+        	$scope.advertPassword = true;
+        	$scope.disable = false;
+        }
+        else {
+					$scope.advertPassword = false;
+        	$scope.advertPasswordText = 'Contraseña débil (4 caracteres mínimo)';
+        	$scope.disable = true;
+        }
+      };
+
+			$scope.restoreInput = function() {
+				if($scope.advertCPassword == false) {
+					$scope.advertCPassword = true;
+        	$scope.disable = false;
+				}
+      };
+
+	}]);
+</script>
+{{ end }}

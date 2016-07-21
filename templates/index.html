@@ -1,0 +1,64 @@
+{{ define "title" }}GO-MENSAJES{{ end }}
+
+{{ define "content" }}
+			<div class="page-header" style="border-bottom: 0px">
+				<h1 align="center">GO-MENSAJES</h1>
+			</div>
+
+			<div ng-controller="LoginCtrl">
+				<form ng-submit="submit()" align="center" class="form-horizontal" style="margin: 0 auto; max-width: 330px; padding: 15px;">
+					<label for="inputUser" class="sr-only">Nickname</label>
+					<input type="text" name="Nickname" ng-model="user.Nickname" id="inputUser" class="form-control" placeholder="Nickname" required autofocus="" style="margin-bottom: 10px; font-size: 16px;">
+
+					<label for="inputPassword" class="sr-only">Contraseña</label>
+					<input type="password" name="Pass" ng-model="user.Password" ng-change="validationInput(user.Password)" class="form-control" id="inputPassword" required placeholder="Contraseña" style="margin-bottom: 20px;  font-size: 16px;">
+
+					<div ng-show="loginError" class="alert alert-danger">{{"{{"}} message {{"}}"}}</div>
+
+					<button ng-disabled="disable" class="btn btn-lg btn-primary btn-block" type="submit">Entrar</button>
+					<a href="/register" class="btn btn-block btn-lg btn-link" role="button">Registrarse</a>
+				</form>
+			</div>
+{{ end }}
+
+{{ define "script" }}
+
+<script type="text/javascript">
+
+	var app = angular.module("MyApp", []);
+
+	app.controller("LoginCtrl", ['$scope', '$http', '$window', function($scope, $http, $window) {
+
+		var strongRegularExp = new RegExp("(^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d){8,}.+$)");
+		$scope.isEmpty = true;
+
+		$scope.submit = function() {
+			//Formamos la cadena JSON con el nombre del usuario y la contraseña
+			var str = '{"Nickname":' + '"' + $scope.user.Nickname + '"' + ' , "Hash":' + '"' + $scope.user.Password + '"' + '}';
+
+			//Parsemaos el string a un objeto JSON
+			var obj = JSON.parse(str);
+
+			//Realizamos la petición POST al servidor
+	  	$http.post('/loginUser', obj).
+	    	success(function(data, status, headers, config) {
+	    		//Si ha habido error en el login mostramos el mensaje de error
+	    		if(data.Type == "error"){
+	    			$scope.message = data.Message;
+	    			$scope.loginError = true;
+	    		}
+	    		else{ //Si no hay error redireccionamos
+	    			$scope.loginError = false;
+						localStorage.setItem('user', $scope.user.Nickname);
+	    			$window.location.href = '/chats';
+	    		}
+	    	}).
+	    	error(function(data, status, headers, config) {
+	      		$scope.message = data;
+		    });
+	    };
+	}]);
+
+</script>
+
+{{ end }}
